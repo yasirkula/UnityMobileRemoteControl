@@ -1,0 +1,1 @@
+VolumeIcon (Volume Up) and Icon (Setting Remote) are taken from Google Material icons library: https://fonts.google.com/icons?selected=Material+Icons:home
