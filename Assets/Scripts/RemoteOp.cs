@@ -2,9 +2,13 @@
 {
 	CheckVolume = 0,
 	ChangeVolume = 1,
-	TriggerKey = 2
+	TriggerKey = 2,
+	TriggerMouseMovement = 3,
+	TriggerMouseButtonDown = 4,
+	TriggerMouseButtonUp = 5
 }
 
+[System.Serializable]
 public struct RemoteOp
 {
 	public RemoteOpType Type;

@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-public class SystemKeyboardPlugin
+public static class SystemKeyboardPlugin
 {
 	public static void TriggerKey( ScanCodeShort key, bool isArrowKey )
 	{

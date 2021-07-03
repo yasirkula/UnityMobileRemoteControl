@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 
@@ -17,10 +18,20 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	private GameObject[] controls;
 
 	[SerializeField]
-	private InputField volumeInputField;
+	private Text volumeText;
 
 	[SerializeField]
 	private float volumeCheckInterval = 5f;
+
+	[SerializeField]
+	private Button toggleTouchpadButton;
+
+	[SerializeField]
+	private GameObject touchpadRoot;
+
+	[SerializeField]
+	private Color touchpadButtonActiveColor;
+	private Color touchpadButtonInactiveColor;
 
 #pragma warning disable 0618
 	[SerializeField]
@@ -53,7 +64,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		set
 		{
 			m_volume = value;
-			volumeInputField.text = value.ToString();
+			volumeText.text = value.ToString();
 		}
 	}
 
@@ -62,8 +73,15 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		for( int i = 0; i < controls.Length; i++ )
 			controls[i].SetActive( false );
 
+		touchpadButtonInactiveColor = toggleTouchpadButton.image.color;
+
 		networkTargets.onValueChanged.AddListener( ( value ) => ConnectedIP = ( value >= 0 && value < networkTargetIPs.Count ) ? networkTargetIPs[value] : null );
-		volumeInputField.onEndEdit.AddListener( ( value ) => SetVolume( int.Parse( value ) ) );
+
+		toggleTouchpadButton.onClick.AddListener( () =>
+		{
+			touchpadRoot.SetActive( !touchpadRoot.activeSelf );
+			toggleTouchpadButton.image.color = touchpadRoot.activeSelf ? touchpadButtonActiveColor : touchpadButtonInactiveColor;
+		} );
 
 		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
 		StartCoroutine( CheckVolumeRegularlyCoroutine() );
@@ -85,7 +103,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		SetVolume( Volume + delta );
 	}
 
-	public void SetVolume( int value )
+	private void SetVolume( int value )
 	{
 		if( string.IsNullOrEmpty( ConnectedIP ) )
 			return;
@@ -102,6 +120,31 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	public void TriggerKeyPress( string key )
 	{
 		SendOp( new RemoteOp( RemoteOpType.TriggerKey, key ) );
+	}
+
+	public void TriggerMouseMovement( BaseEventData eventData )
+	{
+		Vector2 delta = ( (PointerEventData) eventData ).delta;
+		SendOp( new RemoteOp( RemoteOpType.TriggerMouseMovement, JsonUtility.ToJson( delta, false ) ) );
+	}
+
+	public void OnTouchpadClick( BaseEventData eventData )
+	{
+		if( !( (PointerEventData) eventData ).dragging )
+		{
+			TriggerMouseButtonDown( 0 );
+			TriggerMouseButtonUp( 0 );
+		}
+	}
+
+	public void TriggerMouseButtonDown( int button )
+	{
+		SendOp( new RemoteOp( RemoteOpType.TriggerMouseButtonDown, button.ToString() ) );
+	}
+
+	public void TriggerMouseButtonUp( int button )
+	{
+		SendOp( new RemoteOp( RemoteOpType.TriggerMouseButtonUp, button.ToString() ) );
 	}
 
 	private void SendOp( RemoteOp op )

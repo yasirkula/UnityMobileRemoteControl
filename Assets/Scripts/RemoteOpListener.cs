@@ -90,11 +90,14 @@ public class RemoteOpListener : MonoBehaviour
 				int bytesRead = stream.Read( buffer, 0, client.ReceiveBufferSize );
 
 				string dataReceived = Encoding.UTF8.GetString( buffer, 0, bytesRead );
-				Debug.Log( "Operation: " + dataReceived );
 
 				try
 				{
 					RemoteOp op = JsonUtility.FromJson<RemoteOp>( dataReceived );
+
+					if( op.Type != RemoteOpType.TriggerMouseMovement ) // Mouse movement generates too many logs, skipping them might be better than logging them
+						Debug.Log( "Operation: " + dataReceived );
+
 					switch( op.Type )
 					{
 						case RemoteOpType.CheckVolume:
@@ -112,9 +115,9 @@ public class RemoteOpListener : MonoBehaviour
 
 							break;
 						}
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 						case RemoteOpType.TriggerKey:
 						{
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 							string key = op.Data;
 							switch( key )
 							{
@@ -125,10 +128,41 @@ public class RemoteOpListener : MonoBehaviour
 								case "space": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.SPACE, false ); break;
 								default: Debug.LogWarning( "Unknown key: " + key ); break;
 							}
-#endif
 
 							break;
 						}
+						case RemoteOpType.TriggerMouseMovement:
+						{
+							Vector2 delta = JsonUtility.FromJson<Vector2>( op.Data );
+							SystemMousePlugin.MoveCursor( Mathf.RoundToInt( delta.x ), Mathf.RoundToInt( -delta.y ) );
+
+							break;
+						}
+						case RemoteOpType.TriggerMouseButtonDown:
+						{
+							string button = op.Data;
+							switch( button )
+							{
+								case "0": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.LeftDown ); break;
+								case "1": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.RightDown ); break;
+								case "2": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.MiddleDown ); break;
+							}
+
+							break;
+						}
+						case RemoteOpType.TriggerMouseButtonUp:
+						{
+							string button = op.Data;
+							switch( button )
+							{
+								case "0": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.LeftUp ); break;
+								case "1": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.RightUp ); break;
+								case "2": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.MiddleUp ); break;
+							}
+
+							break;
+						}
+#endif
 					}
 				}
 				catch( Exception e )

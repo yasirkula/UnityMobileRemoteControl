@@ -1,6 +1,6 @@
 # Unity Mobile Remote Control
 
-This is a hobby Unity project that allows controlling a **64-bit Windows PC** remotely from a mobile/desktop device. Currently, it allows changing the system's volume and triggering the *left*, *right*, *up*, *down* and *space* keys. I've created this plugin mainly to control the video playback on my computer from afar, preferably from my couch :grinning: The project is created with *Unity 2019.4.26f1*. It uses Unity's *NetworkDiscovery* component to discover the PC from the remote control device.
+This is a hobby Unity project that allows controlling a **64-bit Windows PC** remotely from a mobile/desktop device. Currently, it allows changing the system's volume, moving the mouse cursor around and triggering the *left*, *right*, *up*, *down* and *space* keys. I've created this plugin mainly to control the video playback on my computer from afar, preferably from my couch :grinning: The project is created with *Unity 2019.4.26f1*. It uses Unity's *NetworkDiscovery* component to discover the PC from the remote control device.
 
 ![Demo](Demo.gif)
 
