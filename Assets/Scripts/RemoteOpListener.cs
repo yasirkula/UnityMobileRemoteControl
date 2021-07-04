@@ -115,10 +115,7 @@ public class RemoteOpListener : MonoBehaviour
 						}
 						case RemoteOpType.ChangeVolume:
 						{
-							int volume = int.Parse( op.Data );
-							Debug.Log( "Setting volume: " + volume );
-							Volume = volume;
-
+							Volume = int.Parse( op.Data );
 							break;
 						}
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
@@ -131,9 +128,19 @@ public class RemoteOpListener : MonoBehaviour
 								case "right": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.RIGHT, true ); break;
 								case "down": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.DOWN, true ); break;
 								case "up": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.UP, true ); break;
-								case "space": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.SPACE, false ); break;
+								case "space": SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.SPACE ); break;
 								default: Debug.LogWarning( "Unknown key: " + key ); break;
 							}
+
+							break;
+						}
+						case RemoteOpType.TriggerKeyboardInput:
+						{
+							KeyboardInput input = JsonUtility.FromJson<KeyboardInput>( op.Data );
+							for( int i = 0; i < input.backspace; i++ )
+								SystemKeyboardPlugin.TriggerKey( SystemKeyboardPlugin.ScanCodeShort.BACK );
+							for( int i = 0; i < input.text.Length; i++ )
+								SystemKeyboardPlugin.TriggerUnicodeCharacter( input.text[i] );
 
 							break;
 						}

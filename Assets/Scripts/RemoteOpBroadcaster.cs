@@ -33,6 +33,10 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	private Color touchpadButtonActiveColor;
 	private Color touchpadButtonInactiveColor;
 
+	[SerializeField]
+	private Button toggleKeyboardButton;
+	private TouchScreenKeyboard keyboard;
+
 #pragma warning disable 0618
 	[SerializeField]
 	private NetworkDiscovery networkDiscovery;
@@ -83,6 +87,15 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			toggleTouchpadButton.image.color = touchpadRoot.activeSelf ? touchpadButtonActiveColor : touchpadButtonInactiveColor;
 		} );
 
+		toggleKeyboardButton.onClick.AddListener( () =>
+		{
+			if( keyboard == null && TouchScreenKeyboard.isSupported )
+			{
+				toggleKeyboardButton.image.color = touchpadButtonActiveColor;
+				StartCoroutine( ShowTouchScreenKeyboardCoroutine() );
+			}
+		} );
+
 		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
 		StartCoroutine( CheckVolumeRegularlyCoroutine() );
 
@@ -90,6 +103,9 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		networkDiscovery.StartAsClient();
 
 		Screen.sleepTimeout = SleepTimeout.NeverSleep;
+
+		if( TouchScreenKeyboard.isSupported )
+			TouchScreenKeyboard.hideInput = true;
 	}
 
 	private void OnApplicationQuit()
@@ -181,6 +197,34 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		{
 			Debug.LogException( e );
 		}
+	}
+
+	private IEnumerator ShowTouchScreenKeyboardCoroutine()
+	{
+		string previousText = "                                                  "; // Original text isn't blank so that we can detect backspace input in the beginning, as well
+		keyboard = TouchScreenKeyboard.Open( previousText, TouchScreenKeyboardType.Default, false, true, false, false, "", 0 );
+
+		while( keyboard.active )
+		{
+			string newText = keyboard.text;
+			if( newText != previousText )
+			{
+				int commonPrefixLength = 0, upperBound = Mathf.Min( previousText.Length, newText.Length );
+				while( commonPrefixLength < upperBound && previousText[commonPrefixLength] == newText[commonPrefixLength] )
+					commonPrefixLength++;
+
+				int backspaceCount = previousText.Length - commonPrefixLength;
+				string typedText = commonPrefixLength < newText.Length ? newText.Substring( commonPrefixLength ) : "";
+				previousText = newText;
+
+				SendOp( new RemoteOp( RemoteOpType.TriggerKeyboardInput, JsonUtility.ToJson( new KeyboardInput( backspaceCount, typedText ), false ) ) );
+			}
+
+			yield return null;
+		}
+
+		keyboard = null;
+		toggleKeyboardButton.image.color = touchpadButtonInactiveColor;
 	}
 
 	private IEnumerator CheckNetworkTargetsRegularlyCoroutine()

@@ -1,11 +1,12 @@
 ﻿public enum RemoteOpType
 {
-	CheckVolume = 0,
-	ChangeVolume = 1,
-	TriggerKey = 2,
-	TriggerMouseMovement = 3,
-	TriggerMouseButtonDown = 4,
-	TriggerMouseButtonUp = 5
+	CheckVolume,
+	ChangeVolume,
+	TriggerKey,
+	TriggerKeyboardInput,
+	TriggerMouseMovement,
+	TriggerMouseButtonDown,
+	TriggerMouseButtonUp
 }
 
 [System.Serializable]
@@ -22,7 +23,7 @@ public struct RemoteOp
 }
 
 [System.Serializable]
-public struct MouseDelta
+public struct MouseDelta // Vector2Int doesn't seem to support JsonUtility so this class is a kind of replacement for it
 {
 	public int x, y;
 
@@ -30,5 +31,18 @@ public struct MouseDelta
 	{
 		this.x = x;
 		this.y = y;
+	}
+}
+
+[System.Serializable]
+public struct KeyboardInput
+{
+	public int backspace;
+	public string text;
+
+	public KeyboardInput( int backspace, string text )
+	{
+		this.backspace = backspace;
+		this.text = text;
 	}
 }

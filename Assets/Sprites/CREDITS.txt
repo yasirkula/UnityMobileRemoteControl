@@ -1,1 +1,6 @@
-VolumeIcon (Volume Up), MouseIcon (Mouse) and Icon (Setting Remote) are taken from Google Material icons library: https://fonts.google.com/icons?selected=Material+Icons:home
+The following icons are taken from Google Material icons library ( https://fonts.google.com/icons?selected=Material+Icons:home ):
+
+- VolumeIcon.png (Volume Up)
+- MouseIcon.png (Mouse)
+- KeyboardIcon.png (Keyboard)
+- Icon.psd (Setting Remote)

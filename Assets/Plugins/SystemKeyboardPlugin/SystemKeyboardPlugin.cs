@@ -4,8 +4,10 @@ using System.Runtime.InteropServices;
 
 public static class SystemKeyboardPlugin
 {
-	public static void TriggerKey( ScanCodeShort key, bool isArrowKey )
+	public static void TriggerKey( ScanCodeShort key, bool isArrowKey = false )
 	{
+		INPUT[] inputs = new INPUT[2];
+
 		// Press key
 		INPUT input = new INPUT { type = 1 };
 		input.U.ki.wScan = key;
@@ -13,11 +15,58 @@ public static class SystemKeyboardPlugin
 		if( isArrowKey )
 			input.U.ki.dwFlags |= KEYEVENTF.EXTENDEDKEY;
 
-		SendInput( 1, new INPUT[1] { input }, INPUT.Size );
+		inputs[0] = input;
 
 		// Release key
 		input.U.ki.dwFlags |= KEYEVENTF.KEYUP;
-		SendInput( 1, new INPUT[1] { input }, INPUT.Size );
+		inputs[1] = input;
+
+		SendInput( 2, inputs, INPUT.Size );
+	}
+
+	public static void TriggerUnicodeCharacter( char ch )
+	{
+		INPUT[] inputs = new INPUT[2];
+
+		// Press key
+		INPUT input = new INPUT { type = 1 };
+		input.U.ki.wVk = 0;
+		input.U.ki.wScan = (ScanCodeShort) ch;
+		input.U.ki.dwFlags = KEYEVENTF.UNICODE;
+		inputs[0] = input;
+
+		// Release key
+		input.U.ki.dwFlags = KEYEVENTF.UNICODE | KEYEVENTF.KEYUP;
+		inputs[1] = input;
+
+		SendInput( 2, inputs, INPUT.Size );
+	}
+
+	public static void TriggerCapitalKey( ScanCodeShort key )
+	{
+		INPUT[] inputs = new INPUT[4];
+
+		// Press Shift key
+		INPUT shiftInput = new INPUT { type = 1 };
+		shiftInput.U.ki.wScan = ScanCodeShort.SHIFT;
+		shiftInput.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+		inputs[0] = shiftInput;
+
+		// Press key
+		INPUT input = new INPUT { type = 1 };
+		input.U.ki.wScan = key;
+		input.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+		inputs[1] = input;
+
+		// Release key
+		input.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+		inputs[2] = input;
+
+		// Release Shift key
+		input.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+		inputs[3] = shiftInput;
+
+		SendInput( 4, inputs, INPUT.Size );
 	}
 
 	/// <summary>
