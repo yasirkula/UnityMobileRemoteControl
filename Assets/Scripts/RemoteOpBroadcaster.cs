@@ -51,7 +51,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			if( m_connectedIP != value )
 			{
 				m_connectedIP = value;
-				Debug.Log( "Connected to IP: " + ConnectedIP );
+				Debug.Log( "Connected to IP: " + m_connectedIP );
 				CheckVolume();
 			}
 		}
@@ -125,7 +125,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	public void TriggerMouseMovement( BaseEventData eventData )
 	{
 		Vector2 delta = ( (PointerEventData) eventData ).delta;
-		SendOp( new RemoteOp( RemoteOpType.TriggerMouseMovement, JsonUtility.ToJson( delta, false ) ) );
+		SendOp( new RemoteOp( RemoteOpType.TriggerMouseMovement, JsonUtility.ToJson( new MouseDelta( Mathf.RoundToInt( delta.x ), Mathf.RoundToInt( delta.y ) ), false ) ) );
 	}
 
 	public void OnTouchpadClick( BaseEventData eventData )

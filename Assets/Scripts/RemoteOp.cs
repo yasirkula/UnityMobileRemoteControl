@@ -20,3 +20,15 @@ public struct RemoteOp
 		Data = data;
 	}
 }
+
+[System.Serializable]
+public struct MouseDelta
+{
+	public int x, y;
+
+	public MouseDelta( int x, int y )
+	{
+		this.x = x;
+		this.y = y;
+	}
+}

@@ -63,6 +63,12 @@ public class RemoteOpListener : MonoBehaviour
 			thread.Abort();
 			thread = null;
 		}
+
+		if( listener != null )
+		{
+			listener.Stop();
+			listener = null;
+		}
 	}
 
 	// Source: https://stackoverflow.com/a/27376368/2373034
@@ -133,8 +139,8 @@ public class RemoteOpListener : MonoBehaviour
 						}
 						case RemoteOpType.TriggerMouseMovement:
 						{
-							Vector2 delta = JsonUtility.FromJson<Vector2>( op.Data );
-							SystemMousePlugin.MoveCursor( Mathf.RoundToInt( delta.x ), Mathf.RoundToInt( -delta.y ) );
+							MouseDelta delta = JsonUtility.FromJson<MouseDelta>( op.Data );
+							SystemMousePlugin.MoveCursor( delta.x, -delta.y );
 
 							break;
 						}
