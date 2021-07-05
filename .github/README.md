@@ -9,6 +9,7 @@ This project requires a companion app on both the Windows PC and the remote cont
 - To create the companion app for the Windows PC, enable only the **Listener** scene in **Build Settings** and create a **Standalone x86_64 build**. This companion app must stay open for the remote control to work. Alternatively, you can open the Listener scene in Unity and hit Play
 - To create the companion app for the remote control device, enable only the **Broadcaster** scene in **Build Settings** and create a build for your target platform
 
-![Demo](Demo.gif)
-
-![Demo2](Demo2.gif)
+<p align="center">
+  <img height="560" src="Demo.gif">
+  <img height="560" src="Demo2.gif">
+</p>
