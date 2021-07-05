@@ -14,6 +14,16 @@ public class RemoteOpListener : MonoBehaviour
 	[SerializeField]
 	private NetworkDiscovery networkDiscovery;
 #pragma warning restore 0618
+
+#pragma warning disable 0414
+	[Header( "Mouse Screenshot" )]
+	[SerializeField]
+	private Vector2Int mouseScreenshotRenderArea = new Vector2Int( 128, 128 );
+	[SerializeField]
+	private Vector2Int mouseScreenshotResolution = new Vector2Int( 128, 128 );
+	[SerializeField, Range( 0, 100 )]
+	private int mouseScreenshotQuality = 50;
+#pragma warning restore 0414
 #pragma warning restore 0649
 
 	private TcpListener listener;
@@ -101,7 +111,7 @@ public class RemoteOpListener : MonoBehaviour
 				{
 					RemoteOp op = JsonUtility.FromJson<RemoteOp>( dataReceived );
 
-					if( op.Type != RemoteOpType.TriggerMouseMovement ) // Mouse movement generates too many logs, skipping them might be better than logging them
+					if( op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.RequestMouseScreenshot ) // Some operations occur too often, not logging them might be better
 						Debug.Log( "Operation: " + dataReceived );
 
 					switch( op.Type )
@@ -171,6 +181,16 @@ public class RemoteOpListener : MonoBehaviour
 								case "0": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.LeftUp ); break;
 								case "1": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.RightUp ); break;
 								case "2": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.MiddleUp ); break;
+							}
+
+							break;
+						}
+						case RemoteOpType.RequestMouseScreenshot:
+						{
+							if( !SystemScreenshotPlugin.StreamBitmap( mouseScreenshotRenderArea.x, mouseScreenshotRenderArea.y, mouseScreenshotResolution.x, mouseScreenshotResolution.y, mouseScreenshotQuality, stream ) )
+							{
+								// Always send some data back
+								stream.Write( new byte[4], 0, 4 );
 							}
 
 							break;

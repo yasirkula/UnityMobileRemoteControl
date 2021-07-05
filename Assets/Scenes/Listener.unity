@@ -152,6 +152,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   networkDiscovery: {fileID: 1498476489}
+  mouseScreenshotRenderArea: {x: 256, y: 256}
+  mouseScreenshotResolution: {x: 150, y: 150}
+  mouseScreenshotQuality: 75
 --- !u!20 &304698310
 Camera:
   m_ObjectHideFlags: 0

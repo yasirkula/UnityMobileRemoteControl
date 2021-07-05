@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using UnityEngine;
@@ -14,15 +15,22 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	[SerializeField]
 	private Dropdown networkTargets;
 
+#pragma warning disable 0618
+	[SerializeField]
+	private NetworkDiscovery networkDiscovery;
+#pragma warning restore 0618
+
 	[SerializeField]
 	private GameObject[] controls;
 
+	[Header( "Volume Controls" )]
 	[SerializeField]
 	private Text volumeText;
 
 	[SerializeField]
 	private float volumeCheckInterval = 5f;
 
+	[Header( "Mouse Controls" )]
 	[SerializeField]
 	private Button toggleTouchpadButton;
 
@@ -33,14 +41,19 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	private Color touchpadButtonActiveColor;
 	private Color touchpadButtonInactiveColor;
 
+	[Space]
+	[SerializeField]
+	private float mouseScreenshotRefreshInterval = 0.1f;
+	[SerializeField]
+	private RawImage mouseScreenshotDisplay;
+
+	private Texture2D mouseScreenshot;
+	private Coroutine mouseScreenshotCoroutine;
+
+	[Header( "Keyboard Controls" )]
 	[SerializeField]
 	private Button toggleKeyboardButton;
 	private TouchScreenKeyboard keyboard;
-
-#pragma warning disable 0618
-	[SerializeField]
-	private NetworkDiscovery networkDiscovery;
-#pragma warning restore 0618
 #pragma warning restore 0649
 
 	private readonly List<Dropdown.OptionData> networkTargetNames = new List<Dropdown.OptionData>( 4 );
@@ -85,6 +98,11 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		{
 			touchpadRoot.SetActive( !touchpadRoot.activeSelf );
 			toggleTouchpadButton.image.color = touchpadRoot.activeSelf ? touchpadButtonActiveColor : touchpadButtonInactiveColor;
+
+			if( mouseScreenshotCoroutine != null )
+				StopCoroutine( mouseScreenshotCoroutine );
+			if( touchpadRoot.activeSelf )
+				mouseScreenshotCoroutine = StartCoroutine( GetMouseScreenshotRegularlyCoroutine() );
 		} );
 
 		toggleKeyboardButton.onClick.AddListener( () =>
@@ -189,6 +207,16 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 						break;
 					}
+					case RemoteOpType.RequestMouseScreenshot:
+					{
+						MemoryStream memoryStream = new MemoryStream( client.ReceiveBufferSize );
+						stream.CopyTo( memoryStream, client.ReceiveBufferSize );
+
+						// When LoadImage fails, it might still return true for some reason and the Texture will become an 8x8 question mark
+						mouseScreenshotDisplay.enabled = mouseScreenshot.LoadImage( memoryStream.ToArray(), false ) && ( mouseScreenshot.width != 8 || mouseScreenshot.height != 8 );
+
+						break;
+					}
 				}
 			}
 		}
@@ -225,6 +253,23 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		keyboard = null;
 		toggleKeyboardButton.image.color = touchpadButtonInactiveColor;
+	}
+
+	private IEnumerator GetMouseScreenshotRegularlyCoroutine()
+	{
+		yield return null;
+
+		if( mouseScreenshot == null )
+		{
+			mouseScreenshot = new Texture2D( 2, 2, TextureFormat.RGB24, false );
+			mouseScreenshotDisplay.texture = mouseScreenshot;
+		}
+
+		while( true )
+		{
+			SendOp( new RemoteOp( RemoteOpType.RequestMouseScreenshot, null ) );
+			yield return new WaitForSeconds( mouseScreenshotRefreshInterval );
+		}
 	}
 
 	private IEnumerator CheckNetworkTargetsRegularlyCoroutine()

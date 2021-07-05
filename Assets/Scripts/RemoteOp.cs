@@ -6,7 +6,8 @@
 	TriggerKeyboardInput,
 	TriggerMouseMovement,
 	TriggerMouseButtonDown,
-	TriggerMouseButtonUp
+	TriggerMouseButtonUp,
+	RequestMouseScreenshot
 }
 
 [System.Serializable]
