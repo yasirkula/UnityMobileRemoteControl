@@ -24,24 +24,6 @@ public static class SystemKeyboardPlugin
 		SendInput( 2, inputs, INPUT.Size );
 	}
 
-	public static void TriggerUnicodeCharacter( char ch )
-	{
-		INPUT[] inputs = new INPUT[2];
-
-		// Press key
-		INPUT input = new INPUT { type = 1 };
-		input.U.ki.wVk = 0;
-		input.U.ki.wScan = (ScanCodeShort) ch;
-		input.U.ki.dwFlags = KEYEVENTF.UNICODE;
-		inputs[0] = input;
-
-		// Release key
-		input.U.ki.dwFlags = KEYEVENTF.UNICODE | KEYEVENTF.KEYUP;
-		inputs[1] = input;
-
-		SendInput( 2, inputs, INPUT.Size );
-	}
-
 	public static void TriggerCapitalKey( ScanCodeShort key )
 	{
 		INPUT[] inputs = new INPUT[4];
@@ -63,11 +45,140 @@ public static class SystemKeyboardPlugin
 		inputs[2] = input;
 
 		// Release Shift key
-		input.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+		shiftInput.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
 		inputs[3] = shiftInput;
 
 		SendInput( 4, inputs, INPUT.Size );
 	}
+
+	// Try using KEYEVENTF.SCANCODE for the key but if the key doesn't exist in the keyboard layout, fallback to KEYEVENTF.UNICODE
+	// The advantage of SCANCODE is, it works with all applications including YouTube whereas UNICODE works mostly when typing a text
+	public static void TriggerUnicodeCharacter( char ch )
+	{
+		if( ch == '\n' )
+			TriggerKey( ScanCodeShort.RETURN );
+		else
+		{
+			IntPtr hWnd = GetForegroundWindow();
+			IntPtr keyboardLayout = GetKeyboardLayout( hWnd != null ? GetWindowThreadProcessId( hWnd, IntPtr.Zero ) : 0 );
+
+			short vkRaw = VkKeyScanEx( ch, keyboardLayout );
+			uint vkCode = (uint) ( vkRaw & 0xFF );
+
+			uint scanCode = MapVirtualKeyEx( vkCode, 0, keyboardLayout );
+			if( scanCode > 0 )
+			{
+				bool shiftHeld = ( vkRaw & 0x100 ) > 0;
+				bool ctrlHeld = ( vkRaw & 0x200 ) > 0;
+				bool altHeld = ( vkRaw & 0x400 ) > 0;
+
+				// If character is a letter with both upper-case and lower-case variants and CapsLock is enabled, revert the state of
+				// the Shift key so that the letter isn't affected by the CapsLock
+				if( !ctrlHeld && !altHeld && char.IsLetter( ch ) && CapsLockActive && ( char.ToUpper( ch ) != ch || char.ToLower( ch ) != ch ) )
+					shiftHeld = !shiftHeld;
+
+				INPUT keyInput = new INPUT() { type = 1 };
+				INPUT shiftInput = new INPUT() { type = 1 };
+				INPUT ctrlInput = new INPUT() { type = 1 };
+				INPUT altInput = new INPUT() { type = 1 };
+
+				int totalInputCount = 2, inputIndex = 0;
+
+				if( shiftHeld )
+				{
+					totalInputCount += 2;
+					shiftInput.U.ki.wScan = ScanCodeShort.SHIFT;
+					shiftInput.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+				}
+
+				if( ctrlHeld )
+				{
+					totalInputCount += 2;
+					ctrlInput.U.ki.wScan = ScanCodeShort.CONTROL;
+					ctrlInput.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+				}
+
+				if( altHeld )
+				{
+					totalInputCount += 2;
+					altInput.U.ki.wScan = ScanCodeShort.MENU;
+					altInput.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+				}
+
+				INPUT[] inputs = new INPUT[totalInputCount];
+
+				// Press modifier keys
+				if( shiftHeld )
+					inputs[inputIndex++] = shiftInput;
+				if( ctrlHeld )
+					inputs[inputIndex++] = ctrlInput;
+				if( altHeld )
+					inputs[inputIndex++] = altInput;
+
+				// Press key
+				keyInput.U.ki.wScan = (ScanCodeShort) scanCode;
+				keyInput.U.ki.dwFlags = KEYEVENTF.SCANCODE;
+				inputs[inputIndex++] = keyInput;
+
+				// Release key
+				keyInput.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+				inputs[inputIndex++] = keyInput;
+
+				// Release modifier keys
+				if( shiftHeld )
+				{
+					shiftInput.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+					inputs[inputIndex++] = shiftInput;
+				}
+				if( ctrlHeld )
+				{
+					ctrlInput.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+					inputs[inputIndex++] = ctrlInput;
+				}
+				if( altHeld )
+				{
+					altInput.U.ki.dwFlags = KEYEVENTF.SCANCODE | KEYEVENTF.KEYUP;
+					inputs[inputIndex++] = altInput;
+				}
+
+				SendInput( (uint) totalInputCount, inputs, INPUT.Size );
+			}
+			else
+			{
+				INPUT[] inputs = new INPUT[2];
+
+				// Press key
+				INPUT input = new INPUT { type = 1 };
+				input.U.ki.wVk = 0;
+				input.U.ki.wScan = (ScanCodeShort) ch;
+				input.U.ki.dwFlags = KEYEVENTF.UNICODE;
+				inputs[0] = input;
+
+				// Release key
+				input.U.ki.dwFlags = KEYEVENTF.UNICODE | KEYEVENTF.KEYUP;
+				inputs[1] = input;
+
+				SendInput( 2, inputs, INPUT.Size );
+			}
+		}
+	}
+
+	[DllImport( "user32.dll" )]
+	private static extern IntPtr GetForegroundWindow();
+	[DllImport( "user32.dll" )]
+	static extern uint GetWindowThreadProcessId( IntPtr hWnd, IntPtr ProcessId );
+	[DllImport( "user32.dll" )]
+	static extern IntPtr GetKeyboardLayout( uint idThread );
+	[DllImport( "user32.dll", CharSet = CharSet.Unicode )]
+	static extern short VkKeyScanEx( char ch, IntPtr dwhkl );
+	[DllImport( "user32.dll" )]
+	static extern uint MapVirtualKeyEx( uint uCode, uint uMapType, IntPtr dwhkl );
+
+	// Checking CapsLock's state: https://stackoverflow.com/a/577422/2373034
+	private static bool CapsLockActive { get { return ( ( (ushort) GetKeyState( 0x14 ) ) & 0xffff ) != 0; } }
+
+	[DllImport( "user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi )]
+	public static extern short GetKeyState( int keyCode );
 
 	/// <summary>
 	/// Declaration of external SendInput method
