@@ -41,7 +41,21 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	private Color touchpadButtonActiveColor;
 	private Color touchpadButtonInactiveColor;
 
-	[Space]
+	[SerializeField, Tooltip( "The maximum delay between pointer down and pointer up events for the pointer up to be recognized as mouse click" )]
+	private float touchpadClickMaxHoldTime = 0.5f;
+
+	[Header( "- Mouse Drag Gesture" )]
+	[SerializeField, Tooltip( "Quickly double tapping and then moving the pointer on the touchpad will perform mouse drag operation. This is the maximum delay between double taps for this gesture to be recognized" )]
+	private float touchpadMouseDragMaxPointerDelay = 0.25f;
+	[SerializeField, Tooltip( "Maximum distance between the first tap's pointer release and the second tap's pointer down for these two taps to be accepted as a double tap for mouse drag gesture" )]
+	private float touchpadMouseDragMaxDistanceToSecondTap = 50f;
+
+	private float touchpadPointerDownTime, touchpadPointerUpTime;
+	private Vector2 touchpadPointerUpPosition;
+	private Coroutine touchpadDelayedMouseUpCoroutine;
+	private bool touchpadPerformingMouseDragGesture;
+
+	[Header( "- Mouse Streaming" )]
 	[SerializeField]
 	private float mouseScreenshotRefreshInterval = 0.1f;
 	[SerializeField]
@@ -162,12 +176,70 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		SendOp( new RemoteOp( RemoteOpType.TriggerMouseMovement, JsonUtility.ToJson( new MouseDelta( Mathf.RoundToInt( delta.x ), Mathf.RoundToInt( delta.y ) ), false ) ) );
 	}
 
-	public void OnTouchpadClick( BaseEventData eventData )
+	// ABOUT MOUSE DRAG GESTURE
+	// Quickly double tapping and then moving the pointer on the touchpad will perform a mouse drag operation. To support this gesture, on pointer release,
+	// we must execute only mouse down event and delay mouse up event for a short duration. If user presses the touchpad a second time during that delay,
+	// then we must cancel the pending mouse up event and rather consider the second touch as a mouse drag operation (mouse drag gesture). To summarize:
+	// First pointer release (assuming this was a click, i.e. 'isClick == true'):
+	// - Execute mouse down event
+	// - Execute a mouse up event after 'touchpadMouseDragMaxPointerDelay' seconds ('touchpadDelayedMouseUpCoroutine')
+	// Consecutive pointer down:
+	// - If the delay between this pointer down and previous pointer up was shorter than 'touchpadMouseDragMaxPointerDelay' seconds and the distance between
+	//   these two taps was shorter than 'touchpadMouseDragMaxDistanceToSecondTap' units, consider this a mouse drag gesture ('touchpadExecutingMouseDragGesture = true')
+	//   and cancel the pending mouse up event ('touchpadDelayedMouseUpCoroutine')
+	// Release of the consecutive pointer (when 'touchpadExecutingMouseDragGesture == true'):
+	// - If this was a click (i.e. 'isClick == true'), user wasn't trying to perform a mouse drag gesture but rather double clicking the mouse. First,
+	//   execute a mouse up event because we had canceled the pending mouse up event. Then, perform mouse down and mouse up events in quick succession to
+	//   execute the second mouse click
+	// - If this wasn't a click, user was indeed performing a mouse drag gesture. In this case, simply release the mouse by executing a mouse up event
+	public void OnTouchpadPointerDown( BaseEventData eventData )
 	{
-		if( !( (PointerEventData) eventData ).dragging )
+		touchpadPointerDownTime = Time.time;
+
+		if( ( Time.time - touchpadPointerUpTime ) <= touchpadMouseDragMaxPointerDelay && Vector2.Distance( ( (PointerEventData) eventData ).position, touchpadPointerUpPosition ) <= touchpadMouseDragMaxDistanceToSecondTap && touchpadDelayedMouseUpCoroutine != null )
 		{
-			TriggerMouseButtonDown( 0 );
+			touchpadPerformingMouseDragGesture = true;
+
+			// One may think that the 'touchpadDelayedMouseUpCoroutine != null' check is unnecessary but in the very rare case that the touch happens after
+			// exactly 'touchpadMouseDragMaxPointerDelay' seconds and the coroutine is continued prior to this pointer down function, then the mouse up event
+			// will be executed by the coroutine and we shouldn't perform mouse drag gesture. Hence the 'touchpadDelayedMouseUpCoroutine != null' condition
+			StopCoroutine( touchpadDelayedMouseUpCoroutine );
+			touchpadDelayedMouseUpCoroutine = null;
+		}
+	}
+
+	public void OnTouchpadPointerUp( BaseEventData eventData )
+	{
+		bool isClick = !( (PointerEventData) eventData ).dragging && ( Time.time - touchpadPointerDownTime ) <= touchpadClickMaxHoldTime;
+		touchpadPointerUpTime = 0f;
+
+		if( !touchpadPerformingMouseDragGesture ) // First pointer release
+		{
+			if( isClick )
+			{
+				touchpadPointerUpTime = Time.time;
+				touchpadPointerUpPosition = ( (PointerEventData) eventData ).position;
+
+				if( touchpadDelayedMouseUpCoroutine != null )
+					StopCoroutine( touchpadDelayedMouseUpCoroutine );
+
+				TriggerMouseButtonDown( 0 );
+				touchpadDelayedMouseUpCoroutine = StartCoroutine( PerformDelayedMouseUpCoroutine() );
+			}
+		}
+		else // Release of the consecutive pointer that was executing mouse drag gesture
+		{
+			// Reset the gesture
+			touchpadPerformingMouseDragGesture = false;
+
 			TriggerMouseButtonUp( 0 );
+
+			// This was not a drag gesture but rather a double tap, click the mouse a second time
+			if( isClick )
+			{
+				TriggerMouseButtonDown( 0 );
+				TriggerMouseButtonUp( 0 );
+			}
 		}
 	}
 
@@ -322,6 +394,14 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			CheckVolume();
 			yield return new WaitForSeconds( volumeCheckInterval );
 		}
+	}
+
+	private IEnumerator PerformDelayedMouseUpCoroutine()
+	{
+		yield return new WaitForSeconds( touchpadMouseDragMaxPointerDelay );
+
+		TriggerMouseButtonUp( 0 );
+		touchpadDelayedMouseUpCoroutine = null;
 	}
 
 	private string BytesToString( byte[] bytes )

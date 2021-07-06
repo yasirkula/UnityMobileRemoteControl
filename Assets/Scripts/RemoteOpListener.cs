@@ -111,7 +111,8 @@ public class RemoteOpListener : MonoBehaviour
 				{
 					RemoteOp op = JsonUtility.FromJson<RemoteOp>( dataReceived );
 
-					if( op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.RequestMouseScreenshot ) // Some operations occur too often, not logging them might be better
+					// Some operations occur too often that not logging them might be better
+					if( op.Type != RemoteOpType.CheckVolume && op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.RequestMouseScreenshot )
 						Debug.Log( "Operation: " + dataReceived );
 
 					switch( op.Type )
