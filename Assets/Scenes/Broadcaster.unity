@@ -1192,8 +1192,8 @@ MonoBehaviour:
   touchpadClickMaxHoldTime: 0.5
   touchpadMouseDragMaxPointerDelay: 0.25
   touchpadMouseDragMaxDistanceToSecondTap: 50
-  mouseWheelSensitivity: 2
-  mouseWheelUpdateInterval: 0.1
+  mouseWheelSensitivity: 1.4
+  mouseWheelUpdateInterval: 0.07
   mouseScreenshotRefreshInterval: 0.175
   mouseScreenshotDisplay: {fileID: 521214140}
   toggleKeyboardButton: {fileID: 1547931871}
