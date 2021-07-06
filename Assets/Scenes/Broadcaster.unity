@@ -1180,6 +1180,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   networkTargets: {fileID: 1558371168}
   networkDiscovery: {fileID: 123858987}
+  connectionTimeout: 2500
   controls:
   - {fileID: 1441519359}
   - {fileID: 191064998}

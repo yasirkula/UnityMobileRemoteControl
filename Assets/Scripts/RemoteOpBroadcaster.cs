@@ -21,6 +21,9 @@ public class RemoteOpBroadcaster : MonoBehaviour
 #pragma warning restore 0618
 
 	[SerializeField]
+	private int connectionTimeout = 2500;
+
+	[SerializeField]
 	private GameObject[] controls;
 
 	[Header( "Volume Controls" )]
@@ -90,8 +93,12 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			if( m_connectedIP != value )
 			{
 				m_connectedIP = value;
-				Debug.Log( "Connected to IP: " + m_connectedIP );
-				CheckVolume();
+
+				if( !string.IsNullOrEmpty( m_connectedIP ) )
+				{
+					Debug.Log( "Connected to IP: " + m_connectedIP );
+					CheckVolume();
+				}
 			}
 		}
 	}
@@ -301,8 +308,10 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		try
 		{
-			using( TcpClient client = new TcpClient( ConnectedIP, networkDiscovery.broadcastPort ) )
+			using( TcpClient client = new TcpClient() { ReceiveTimeout = connectionTimeout, SendTimeout = connectionTimeout } )
 			{
+				client.Connect( ConnectedIP, networkDiscovery.broadcastPort );
+
 				NetworkStream stream = client.GetStream();
 				byte[] bytesToSend = Encoding.UTF8.GetBytes( JsonUtility.ToJson( op, false ) );
 
@@ -333,7 +342,25 @@ public class RemoteOpBroadcaster : MonoBehaviour
 				}
 			}
 		}
-		catch( SocketException ) { }
+		catch( IOException e )
+		{
+			Debug.LogException( e );
+			Debug.Log( "Connection lost: " + ConnectedIP );
+
+			// IOException can be thrown during a timeout, it is likely that our connection to the target is lost. We should reset the connection:
+			// - Clear the cached connections so that active connections can be found from scratch
+			networkDiscovery.broadcastsReceived.Clear();
+			// - If there is still an active connection elsewhere, it will be found by CheckNetworkTargetsRegularlyCoroutine
+			ConnectedIP = null;
+		}
+		catch( SocketException e ) // Same as IOException
+		{
+			Debug.LogException( e );
+			Debug.Log( "Connection lost: " + ConnectedIP );
+
+			networkDiscovery.broadcastsReceived.Clear();
+			ConnectedIP = null;
+		}
 		catch( Exception e )
 		{
 			Debug.LogException( e );
