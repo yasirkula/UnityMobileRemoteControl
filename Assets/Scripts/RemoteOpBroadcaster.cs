@@ -55,6 +55,14 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	private Coroutine touchpadDelayedMouseUpCoroutine;
 	private bool touchpadPerformingMouseDragGesture;
 
+	[Header( "Mouse Wheel" )]
+	[SerializeField]
+	private float mouseWheelSensitivity = 5f;
+	[SerializeField, Tooltip( "Scroll wheel event will be executed at this interval as long as the middle mouse button is held in touchpad" )]
+	private float mouseWheelUpdateInterval = 0.1f;
+	private int mouseWheelDelta;
+	private Coroutine mouseWheelUpdateCoroutine;
+
 	[Header( "- Mouse Streaming" )]
 	[SerializeField]
 	private float mouseScreenshotRefreshInterval = 0.1f;
@@ -99,7 +107,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		}
 	}
 
-	private void Start()
+	private IEnumerator Start()
 	{
 		for( int i = 0; i < controls.Length; i++ )
 			controls[i].SetActive( false );
@@ -128,9 +136,6 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			}
 		} );
 
-		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
-		StartCoroutine( CheckVolumeRegularlyCoroutine() );
-
 		networkDiscovery.Initialize();
 		networkDiscovery.StartAsClient();
 
@@ -138,6 +143,11 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		if( TouchScreenKeyboard.isSupported )
 			TouchScreenKeyboard.hideInput = true;
+
+		yield return null;
+
+		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
+		StartCoroutine( CheckVolumeRegularlyCoroutine() );
 	}
 
 	private void OnApplicationQuit()
@@ -253,6 +263,37 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		SendOp( new RemoteOp( RemoteOpType.TriggerMouseButtonUp, button.ToString() ) );
 	}
 
+	public void OnMiddleMouseButtonDown( BaseEventData eventData )
+	{
+		mouseWheelDelta = 0;
+
+		if( mouseWheelUpdateCoroutine == null )
+			mouseWheelUpdateCoroutine = StartCoroutine( UpdateMouseWheelRegularlyCoroutine() );
+	}
+
+	public void OnMiddleMouseButtonUp( BaseEventData eventData )
+	{
+		if( mouseWheelUpdateCoroutine != null )
+		{
+			StopCoroutine( mouseWheelUpdateCoroutine );
+			mouseWheelUpdateCoroutine = null;
+		}
+
+		// Execute middle mouse button click
+		if( !( (PointerEventData) eventData ).dragging )
+		{
+			SendOp( new RemoteOp( RemoteOpType.TriggerMouseButtonDown, "2" ) );
+			SendOp( new RemoteOp( RemoteOpType.TriggerMouseButtonUp, "2" ) );
+		}
+	}
+
+	public void OnMiddleMouseButtonDrag( BaseEventData eventData )
+	{
+		// Simulate mouse scroll wheel
+		float scroll = ( (PointerEventData) eventData ).position.y - ( (PointerEventData) eventData ).pressPosition.y;
+		mouseWheelDelta = Mathf.RoundToInt( scroll * mouseWheelSensitivity );
+	}
+
 	private void SendOp( RemoteOp op )
 	{
 		if( string.IsNullOrEmpty( ConnectedIP ) )
@@ -329,8 +370,6 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 	private IEnumerator GetMouseScreenshotRegularlyCoroutine()
 	{
-		yield return null;
-
 		if( mouseScreenshot == null )
 		{
 			mouseScreenshot = new Texture2D( 2, 2, TextureFormat.RGB24, false );
@@ -346,8 +385,6 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 	private IEnumerator CheckNetworkTargetsRegularlyCoroutine()
 	{
-		yield return null;
-
 		while( true )
 		{
 			networkTargetNames.Clear();
@@ -387,8 +424,6 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 	private IEnumerator CheckVolumeRegularlyCoroutine()
 	{
-		yield return null;
-
 		while( true )
 		{
 			CheckVolume();
@@ -402,6 +437,17 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		TriggerMouseButtonUp( 0 );
 		touchpadDelayedMouseUpCoroutine = null;
+	}
+
+	private IEnumerator UpdateMouseWheelRegularlyCoroutine()
+	{
+		while( true )
+		{
+			if( mouseWheelDelta != 0 )
+				SendOp( new RemoteOp( RemoteOpType.TriggerMouseWheel, mouseWheelDelta.ToString() ) );
+
+			yield return new WaitForSeconds( mouseWheelUpdateInterval );
+		}
 	}
 
 	private string BytesToString( byte[] bytes )

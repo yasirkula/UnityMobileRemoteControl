@@ -112,7 +112,7 @@ public class RemoteOpListener : MonoBehaviour
 					RemoteOp op = JsonUtility.FromJson<RemoteOp>( dataReceived );
 
 					// Some operations occur too often that not logging them might be better
-					if( op.Type != RemoteOpType.CheckVolume && op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.RequestMouseScreenshot )
+					if( op.Type != RemoteOpType.CheckVolume && op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.TriggerMouseWheel && op.Type != RemoteOpType.RequestMouseScreenshot )
 						Debug.Log( "Operation: " + dataReceived );
 
 					switch( op.Type )
@@ -183,6 +183,13 @@ public class RemoteOpListener : MonoBehaviour
 								case "1": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.RightUp ); break;
 								case "2": SystemMousePlugin.MouseEvent( SystemMousePlugin.MouseEventFlags.MiddleUp ); break;
 							}
+
+							break;
+						}
+						case RemoteOpType.TriggerMouseWheel:
+						{
+							int delta = int.Parse( op.Data );
+							SystemMousePlugin.MouseScrollWheel( delta );
 
 							break;
 						}

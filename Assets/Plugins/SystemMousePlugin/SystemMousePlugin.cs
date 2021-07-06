@@ -14,7 +14,8 @@ public static class SystemMousePlugin
 		Move = 0x00000001,
 		Absolute = 0x00008000,
 		RightDown = 0x00000008,
-		RightUp = 0x00000010
+		RightUp = 0x00000010,
+		Wheel = 0x00000800
 	}
 
 	[DllImport( "user32.dll", EntryPoint = "SetCursorPos" )]
@@ -45,6 +46,11 @@ public static class SystemMousePlugin
 	{
 		MousePoint position = GetCursorPosition();
 		mouse_event( (int) value, position.X, position.Y, 0, 0 );
+	}
+
+	public static void MouseScrollWheel( int delta )
+	{
+		mouse_event( (int) MouseEventFlags.Wheel, 0, 0, delta, 0 );
 	}
 
 	[StructLayout( LayoutKind.Sequential )]

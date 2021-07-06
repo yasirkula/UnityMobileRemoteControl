@@ -7,6 +7,7 @@
 	TriggerMouseMovement,
 	TriggerMouseButtonDown,
 	TriggerMouseButtonUp,
+	TriggerMouseWheel,
 	RequestMouseScreenshot
 }
 
