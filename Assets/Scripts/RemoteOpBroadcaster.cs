@@ -114,6 +114,59 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		}
 	}
 
+#if !UNITY_EDITOR && UNITY_ANDROID
+	private AndroidJavaClass m_ajc = null;
+	private AndroidJavaClass AJC
+	{
+		get
+		{
+			if( m_ajc == null )
+				m_ajc = new AndroidJavaClass( "com.yasirkula.remotecontrol.NotificationsManager" );
+
+			return m_ajc;
+		}
+	}
+
+	private AndroidJavaObject m_context = null;
+	private AndroidJavaObject Context
+	{
+		get
+		{
+			if( m_context == null )
+			{
+				using( AndroidJavaObject unityClass = new AndroidJavaClass( "com.unity3d.player.UnityPlayer" ) )
+					m_context = unityClass.GetStatic<AndroidJavaObject>( "currentActivity" );
+			}
+
+			return m_context;
+		}
+	}
+
+	private AndroidNotificationInputReceiver m_androidNotificationInputReceiver = null;
+	private AndroidNotificationInputReceiver AndroidNotificationInputReceiver
+	{
+		get
+		{
+			if( m_androidNotificationInputReceiver == null )
+			{
+				m_androidNotificationInputReceiver = new AndroidNotificationInputReceiver( ( inputType ) =>
+				{
+					switch( inputType )
+					{
+						case AndroidNotificationInputType.VolumeDown: SendOp( new RemoteOp( RemoteOpType.IncrementVolume, "-5" ) ); break;
+						case AndroidNotificationInputType.VolumeUp: SendOp( new RemoteOp( RemoteOpType.IncrementVolume, "5" ) ); break;
+						case AndroidNotificationInputType.LeftArrow: SendOp( new RemoteOp( RemoteOpType.TriggerKey, "left" ) ); break;
+						case AndroidNotificationInputType.RightArrow: SendOp( new RemoteOp( RemoteOpType.TriggerKey, "right" ) ); break;
+						case AndroidNotificationInputType.Spacebar: SendOp( new RemoteOp( RemoteOpType.TriggerKey, "space" ) ); break;
+					}
+				} );
+			}
+
+			return m_androidNotificationInputReceiver;
+		}
+	}
+#endif
+
 	private IEnumerator Start()
 	{
 		for( int i = 0; i < controls.Length; i++ )
@@ -151,6 +204,8 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		if( TouchScreenKeyboard.isSupported )
 			TouchScreenKeyboard.hideInput = true;
 
+		Application.targetFrameRate = 60;
+
 		yield return null;
 
 		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
@@ -163,6 +218,24 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			networkDiscovery.StopBroadcast();
 	}
 
+#if !UNITY_EDITOR && UNITY_ANDROID
+	// On Android, show the app's notification when the app is minimized. Hide the notification when the application is reopened
+	private void OnApplicationPause( bool pause )
+	{
+		try
+		{
+			if( !pause )
+				AJC.CallStatic( "HideNotification", Context );
+			else if( networkTargets.interactable )
+				AJC.CallStatic( "ShowNotification", Context, AndroidNotificationInputReceiver );
+		}
+		catch( Exception e )
+		{
+			Debug.LogException( e );
+		}
+	}
+#endif
+
 	public void IncrementVolume( int delta )
 	{
 		SetVolume( Volume + delta );
@@ -174,7 +247,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 			return;
 
 		Volume = Mathf.Clamp( value, 0, 100 );
-		SendOp( new RemoteOp( RemoteOpType.ChangeVolume, Volume.ToString() ) );
+		SendOp( new RemoteOp( RemoteOpType.SetVolume, Volume.ToString() ) );
 	}
 
 	private void CheckVolume()
@@ -425,14 +498,17 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 			if( networkTargetNames.Count == 0 )
 			{
-				networkTargets.interactable = false;
-				networkTargets.value = 0;
-				networkTargets.options = new List<Dropdown.OptionData>( 1 ) { new Dropdown.OptionData( "Scanning network..." ) };
+				if( networkTargets.interactable )
+				{
+					networkTargets.interactable = false;
+					networkTargets.value = 0;
+					networkTargets.options = new List<Dropdown.OptionData>( 1 ) { new Dropdown.OptionData( "Scanning network..." ) };
 
-				ConnectedIP = null;
+					ConnectedIP = null;
 
-				for( int i = 0; i < controls.Length; i++ )
-					controls[i].SetActive( false );
+					for( int i = 0; i < controls.Length; i++ )
+						controls[i].SetActive( false );
+				}
 			}
 			else
 			{
@@ -441,8 +517,11 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 				ConnectedIP = ( networkTargets.value >= 0 && networkTargets.value < networkTargetIPs.Count ) ? networkTargetIPs[networkTargets.value] : null;
 
-				for( int i = 0; i < controls.Length; i++ )
-					controls[i].SetActive( true );
+				if( !controls[0].activeSelf )
+				{
+					for( int i = 0; i < controls.Length; i++ )
+						controls[i].SetActive( true );
+				}
 			}
 
 			yield return new WaitForSeconds( networkDiscovery.broadcastInterval * 0.001f );

@@ -9,7 +9,16 @@ This project requires a companion app on both the Windows PC and the remote cont
 - To create the companion app for the Windows PC, enable only the **Listener** scene in **Build Settings** and create a **Standalone x86_64 build**. This companion app must stay open for the remote control to work. Alternatively, you can open the Listener scene in Unity and hit Play
 - To create the companion app for the remote control device, enable only the **Broadcaster** scene in **Build Settings** and create a build for your target platform
 
-<p align="center">
-  <img height="560" src="Demo.gif">
-  <img height="560" src="Demo2.gif">
-</p>
+## HIGHLIGHTS
+
+- Keyboard & volume controls (clicking the keyboard icon will prompt the on-screen keyboard, allowing sending arbitrary key inputs to the PC)
+
+![keyboard_controls](Images/KeyboardControls.gif)
+
+- Mouse controls
+
+![mouse_controls](Images/MouseControls.gif)
+
+- *(Android only)* Quick action buttons in the notification bar when the companion app is minimized
+
+![mouse_controls](Images/AndroidNotifications.png)

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.yasirkula.remotecontrol" >
+    <application>
+        <receiver android:name="com.yasirkula.remotecontrol.NotificationsManager$NotificationInputReceiver" android:exported="false" />
+        <service android:name="com.yasirkula.remotecontrol.NotificationsManager$NotificationService" android:exported="false" />
+    </application>
+	
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-sdk android:targetSdkVersion="4" />
+</manifest>

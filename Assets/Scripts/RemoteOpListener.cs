@@ -33,7 +33,7 @@ public class RemoteOpListener : MonoBehaviour
 	{
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 		get { return Mathf.Clamp( Mathf.RoundToInt( SystemVolumePlugin.GetVolume() * 100f ), 0, 100 ); }
-		set { SystemVolumePlugin.SetVolume( value * 0.01f ); }
+		set { SystemVolumePlugin.SetVolume( Mathf.Clamp01( value * 0.01f ) ); }
 #else
 		get { return 0; }
 		set { }
@@ -124,9 +124,14 @@ public class RemoteOpListener : MonoBehaviour
 
 							break;
 						}
-						case RemoteOpType.ChangeVolume:
+						case RemoteOpType.SetVolume:
 						{
 							Volume = int.Parse( op.Data );
+							break;
+						}
+						case RemoteOpType.IncrementVolume:
+						{
+							Volume += int.Parse( op.Data );
 							break;
 						}
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN

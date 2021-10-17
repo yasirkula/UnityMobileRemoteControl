@@ -1,7 +1,8 @@
 ﻿public enum RemoteOpType
 {
 	CheckVolume,
-	ChangeVolume,
+	SetVolume,
+	IncrementVolume,
 	TriggerKey,
 	TriggerKeyboardInput,
 	TriggerMouseMovement,
