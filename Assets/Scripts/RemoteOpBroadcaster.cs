@@ -26,6 +26,13 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	[SerializeField]
 	private GameObject[] controls;
 
+#pragma warning disable 0414
+#if UNITY_EDITOR || UNITY_ANDROID
+	[SerializeField]
+	private bool canDismissAndroidNotification = true;
+#endif
+#pragma warning restore 0414
+
 	[Header( "Volume Controls" )]
 	[SerializeField]
 	private Text volumeText;
@@ -121,7 +128,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		get
 		{
 			if( m_ajc == null )
-				m_ajc = new AndroidJavaClass( "com.yasirkula.remotecontrol.NotificationsManager" );
+				m_ajc = new AndroidJavaClass( "com.yasirkula.remotecontrol.RemoteControl" );
 
 			return m_ajc;
 		}
@@ -210,6 +217,11 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
 		StartCoroutine( CheckVolumeRegularlyCoroutine() );
+
+#if !UNITY_EDITOR && UNITY_ANDROID
+		using( AndroidJavaObject notificationServiceClass = new AndroidJavaClass( "com.yasirkula.remotecontrol.NotificationService" ) )
+			notificationServiceClass.SetStatic( "dismissibleNotifications", canDismissAndroidNotification );
+#endif
 	}
 
 	private void OnApplicationQuit()

@@ -1185,6 +1185,7 @@ MonoBehaviour:
   - {fileID: 1441519359}
   - {fileID: 191064998}
   - {fileID: 1167380858}
+  canDismissAndroidNotification: 1
   volumeText: {fileID: 830562041}
   volumeCheckInterval: 2.5
   toggleTouchpadButton: {fileID: 837428470}

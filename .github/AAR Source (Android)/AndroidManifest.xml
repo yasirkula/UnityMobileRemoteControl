@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.yasirkula.remotecontrol" >
     <application>
-        <receiver android:name="com.yasirkula.remotecontrol.NotificationsManager$NotificationInputReceiver" android:exported="false" />
-        <service android:name="com.yasirkula.remotecontrol.NotificationsManager$NotificationService" android:exported="false" />
+        <receiver android:name="com.yasirkula.remotecontrol.NotificationInputReceiver" android:exported="false" />
+        <service android:name="com.yasirkula.remotecontrol.NotificationService" android:exported="false" />
+		<provider
+            android:name="com.yasirkula.remotecontrol.RemoteControlContentProvider"
+            android:authorities="${applicationId}.RemoteControlContentProvider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 	
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
