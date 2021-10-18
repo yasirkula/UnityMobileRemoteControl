@@ -1,14 +1,19 @@
-﻿using System;
+﻿#if UNITY_STANDALONE_WIN
+using B83.Win32;
+#endif
+using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Networking;
 
 public class RemoteOpListener : MonoBehaviour
 {
+	public const string NO_PENDING_FILE_TRANSFER = "0";
+
 #pragma warning disable 0649
 #pragma warning disable 0618
 	[SerializeField]
@@ -23,8 +28,13 @@ public class RemoteOpListener : MonoBehaviour
 	private Vector2Int mouseScreenshotResolution = new Vector2Int( 128, 128 );
 	[SerializeField, Range( 0, 100 )]
 	private int mouseScreenshotQuality = 50;
+
+	private readonly byte[] dummyMouseScreenshotData = new byte[4];
 #pragma warning restore 0414
 #pragma warning restore 0649
+
+	private string pendingFileTransfer;
+	private byte[] networkStreamBuffer;
 
 	private TcpListener listener;
 	private Thread thread;
@@ -61,6 +71,24 @@ public class RemoteOpListener : MonoBehaviour
 		networkDiscovery.broadcastData = SystemInfo.deviceName;
 		networkDiscovery.Initialize();
 		networkDiscovery.StartAsServer();
+
+#if UNITY_STANDALONE_WIN
+		UnityDragAndDropHook.InstallHook();
+		UnityDragAndDropHook.OnDroppedFiles += ( files, dropPosition ) =>
+		{
+			if( files != null )
+			{
+				for( int i = 0; i < files.Count; i++ )
+				{
+					if( !string.IsNullOrEmpty( files[i] ) && File.Exists( files[i] ) )
+					{
+						pendingFileTransfer = files[i];
+						break;
+					}
+				}
+			}
+		};
+#endif
 	}
 
 	private void OnApplicationQuit()
@@ -79,6 +107,10 @@ public class RemoteOpListener : MonoBehaviour
 			listener.Stop();
 			listener = null;
 		}
+
+#if UNITY_STANDALONE_WIN
+		UnityDragAndDropHook.UninstallHook();
+#endif
 	}
 
 	// Source: https://stackoverflow.com/a/27376368/2373034
@@ -101,27 +133,21 @@ public class RemoteOpListener : MonoBehaviour
 			using( TcpClient client = listener.AcceptTcpClient() )
 			{
 				NetworkStream stream = client.GetStream();
-
-				byte[] buffer = new byte[client.ReceiveBufferSize];
-				int bytesRead = stream.Read( buffer, 0, client.ReceiveBufferSize );
-
-				string dataReceived = Encoding.UTF8.GetString( buffer, 0, bytesRead );
+				string dataReceived = stream.ReadString( ref networkStreamBuffer, client.ReceiveBufferSize );
 
 				try
 				{
 					RemoteOp op = JsonUtility.FromJson<RemoteOp>( dataReceived );
 
 					// Some operations occur too often that not logging them might be better
-					if( op.Type != RemoteOpType.CheckVolume && op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.TriggerMouseWheel && op.Type != RemoteOpType.RequestMouseScreenshot )
+					if( op.Type != RemoteOpType.CheckVolume && op.Type != RemoteOpType.TriggerMouseMovement && op.Type != RemoteOpType.TriggerMouseWheel && op.Type != RemoteOpType.RequestMouseScreenshot && op.Type != RemoteOpType.CheckPendingFileTransfer )
 						Debug.Log( "Operation: " + dataReceived );
 
 					switch( op.Type )
 					{
 						case RemoteOpType.CheckVolume:
 						{
-							byte[] bytesToSend = Encoding.UTF8.GetBytes( Volume.ToString() );
-							stream.Write( bytesToSend, 0, bytesToSend.Length );
-
+							stream.WriteString( Volume.ToString() );
 							break;
 						}
 						case RemoteOpType.SetVolume:
@@ -203,7 +229,45 @@ public class RemoteOpListener : MonoBehaviour
 							if( !SystemScreenshotPlugin.StreamBitmap( mouseScreenshotRenderArea.x, mouseScreenshotRenderArea.y, mouseScreenshotResolution.x, mouseScreenshotResolution.y, mouseScreenshotQuality, stream ) )
 							{
 								// Always send some data back
-								stream.Write( new byte[4], 0, 4 );
+								stream.Write( dummyMouseScreenshotData, 0, dummyMouseScreenshotData.Length );
+							}
+
+							break;
+						}
+						case RemoteOpType.CheckPendingFileTransfer:
+						{
+							string _pendingFileTransfer = NO_PENDING_FILE_TRANSFER;
+							if( !string.IsNullOrEmpty( pendingFileTransfer ) )
+							{
+								FileInfo pendingFile = new FileInfo( pendingFileTransfer );
+								if( pendingFile.Exists && pendingFile.Length > 0L )
+									_pendingFileTransfer = pendingFileTransfer;
+
+								pendingFileTransfer = null;
+							}
+
+							stream.WriteString( _pendingFileTransfer );
+
+							break;
+						}
+						case RemoteOpType.InitiateFileTransfer:
+						{
+							string filePath = op.Data;
+							if( !File.Exists( filePath ) )
+								stream.WriteLong( 0L );
+							else
+							{
+								// Credit: https://stackoverflow.com/a/21261198/2373034
+								using( FileStream fileStream = File.OpenRead( filePath ) )
+								{
+									// Send filesize first
+									stream.WriteLong( fileStream.Length );
+
+									// Send the file
+									int count;
+									while( ( count = fileStream.Read( networkStreamBuffer, 0, networkStreamBuffer.Length ) ) > 0 )
+										stream.Write( networkStreamBuffer, 0, count );
+								}
 							}
 
 							break;

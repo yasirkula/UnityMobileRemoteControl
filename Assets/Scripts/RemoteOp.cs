@@ -9,7 +9,9 @@
 	TriggerMouseButtonDown,
 	TriggerMouseButtonUp,
 	TriggerMouseWheel,
-	RequestMouseScreenshot
+	RequestMouseScreenshot,
+	CheckPendingFileTransfer,
+	InitiateFileTransfer
 }
 
 [System.Serializable]

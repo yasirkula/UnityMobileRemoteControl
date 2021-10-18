@@ -19,6 +19,10 @@ This project requires a companion app on both the Windows PC and the remote cont
 
 ![mouse_controls](Images/MouseControls.gif)
 
+- Quickly transferring a file from the PC to the companion app (e.g. sending an APK to Android without USB cable)
+
+![file_transfer](Images/FileTransfer.gif)
+
 - *(Android only)* Quick action buttons in the notification bar when the companion app is minimized
 
 ![mouse_controls](Images/AndroidNotifications.png)

@@ -1,9 +1,11 @@
-﻿using System;
+﻿using SimpleFileBrowser;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Networking;
@@ -86,10 +88,28 @@ public class RemoteOpBroadcaster : MonoBehaviour
 	[SerializeField]
 	private Button toggleKeyboardButton;
 	private TouchScreenKeyboard keyboard;
+
+	[Header( "File Transfer" )]
+	[SerializeField]
+	private float pendingFileTransferCheckInterval = 1f;
+
+	[SerializeField]
+	private GameObject downloadProgressPanel, downloadCompletedPanel;
+	[SerializeField]
+	private Slider downloadProgressbar;
+	[SerializeField]
+	private Button downloadCancelButton;
+	[SerializeField]
+	private Text downloadProgressLabel, downloadCompletedLabel;
+
+	private string fileTransferDownloadPath;
+	private bool fileTransferInProgress;
 #pragma warning restore 0649
 
 	private readonly List<Dropdown.OptionData> networkTargetNames = new List<Dropdown.OptionData>( 4 );
 	private readonly List<string> networkTargetIPs = new List<string>( 4 );
+
+	private byte[] networkStreamBuffer;
 
 	private string m_connectedIP;
 	private string ConnectedIP
@@ -179,6 +199,9 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		for( int i = 0; i < controls.Length; i++ )
 			controls[i].SetActive( false );
 
+		downloadProgressPanel.SetActive( false );
+		downloadCompletedPanel.SetActive( false );
+
 		touchpadButtonInactiveColor = toggleTouchpadButton.image.color;
 
 		networkTargets.onValueChanged.AddListener( ( value ) => ConnectedIP = ( value >= 0 && value < networkTargetIPs.Count ) ? networkTargetIPs[value] : null );
@@ -217,6 +240,7 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 		StartCoroutine( CheckNetworkTargetsRegularlyCoroutine() );
 		StartCoroutine( CheckVolumeRegularlyCoroutine() );
+		StartCoroutine( CheckPendingFileTransfersRegularlyCoroutine() );
 
 #if !UNITY_EDITOR && UNITY_ANDROID
 		using( AndroidJavaObject notificationServiceClass = new AndroidJavaClass( "com.yasirkula.remotecontrol.NotificationService" ) )
@@ -386,9 +410,23 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		mouseWheelDelta = Mathf.RoundToInt( scroll * mouseWheelSensitivity );
 	}
 
-	private void SendOp( RemoteOp op )
+	public void OpenDownloadedFile()
+	{
+#if !UNITY_EDITOR && UNITY_ANDROID
+		AJC.CallStatic( "OpenFile", Context, fileTransferDownloadPath );
+#else
+		Application.OpenURL( fileTransferDownloadPath );
+#endif
+	}
+
+	private async void SendOp( RemoteOp op )
 	{
 		if( string.IsNullOrEmpty( ConnectedIP ) )
+			return;
+
+		// In the current implementation, we can have only a single active connection to the target device and
+		// that connection will be busy while transferring a file
+		if( fileTransferInProgress )
 			return;
 
 		try
@@ -398,20 +436,14 @@ public class RemoteOpBroadcaster : MonoBehaviour
 				client.Connect( ConnectedIP, networkDiscovery.broadcastPort );
 
 				NetworkStream stream = client.GetStream();
-				byte[] bytesToSend = Encoding.UTF8.GetBytes( JsonUtility.ToJson( op, false ) );
-
-				// Send request
-				stream.Write( bytesToSend, 0, bytesToSend.Length );
+				stream.WriteString( JsonUtility.ToJson( op, false ) ); // Send request
 
 				switch( op.Type )
 				{
 					case RemoteOpType.CheckVolume:
 					{
 						// Retrieve volume value
-						byte[] buffer = new byte[client.ReceiveBufferSize];
-						int bytesRead = stream.Read( buffer, 0, client.ReceiveBufferSize );
-						Volume = int.Parse( Encoding.UTF8.GetString( buffer, 0, bytesRead ) );
-
+						Volume = int.Parse( stream.ReadString( ref networkStreamBuffer, client.ReceiveBufferSize ) );
 						break;
 					}
 					case RemoteOpType.RequestMouseScreenshot:
@@ -421,6 +453,105 @@ public class RemoteOpBroadcaster : MonoBehaviour
 
 						// When LoadImage fails, it might still return true for some reason and the Texture will become an 8x8 question mark
 						mouseScreenshotDisplay.enabled = mouseScreenshot.LoadImage( memoryStream.ToArray(), false ) && ( mouseScreenshot.width != 8 || mouseScreenshot.height != 8 );
+
+						break;
+					}
+					case RemoteOpType.CheckPendingFileTransfer:
+					{
+						// Retrieve the path of the pending file transfer
+						string pendingFileTransferPath = stream.ReadString( ref networkStreamBuffer, client.ReceiveBufferSize );
+						if( !string.IsNullOrEmpty( pendingFileTransferPath ) && pendingFileTransferPath != RemoteOpListener.NO_PENDING_FILE_TRANSFER && !fileTransferInProgress )
+						{
+							fileTransferInProgress = true;
+
+							string filename = Path.GetFileName( ( Path.DirectorySeparatorChar == '\\' ) ? pendingFileTransferPath : pendingFileTransferPath.Replace( '\\', '/' ) );
+							string fileExtension = Path.GetExtension( filename );
+							if( string.IsNullOrEmpty( fileExtension ) )
+								FileBrowser.SetFilters( true, (string[]) null );
+							else
+							{
+								FileBrowser.SetFilters( true, fileExtension );
+								FileBrowser.SetDefaultFilter( fileExtension );
+							}
+
+							FileBrowser.ShowSaveDialog( ( paths ) =>
+							{
+								fileTransferInProgress = false;
+								fileTransferDownloadPath = paths[0];
+
+								SendOp( new RemoteOp( RemoteOpType.InitiateFileTransfer, pendingFileTransferPath ) );
+							},
+							() => fileTransferInProgress = false, FileBrowser.PickMode.Files, initialFilename: filename, title: "Downloading: " + filename, saveButtonText: "Download" );
+						}
+
+						break;
+					}
+					case RemoteOpType.InitiateFileTransfer:
+					{
+						fileTransferInProgress = true;
+						try
+						{
+							// Credit: https://stackoverflow.com/a/21261198/2373034
+							// Read file size first
+							long fileSize = stream.ReadLong( ref networkStreamBuffer );
+							if( fileSize > 0L )
+							{
+								string downloadedFilename = Path.GetFileName( ( Path.DirectorySeparatorChar == '\\' ) ? op.Data : op.Data.Replace( '\\', '/' ) );
+								string fileSizeDisplay;
+								if( fileSize < 1048576L ) // 1MB
+									fileSizeDisplay = ( fileSize / 1024.0 ).ToString( "F1", CultureInfo.InvariantCulture ) + "KB";
+								else
+									fileSizeDisplay = ( fileSize / 1048576.0 ).ToString( "F1", CultureInfo.InvariantCulture ) + "MB";
+
+								downloadProgressbar.value = 0f;
+								downloadProgressLabel.text = string.Format( "Downloading ({0}):\n{1}", fileSizeDisplay, downloadedFilename );
+								downloadCancelButton.onClick.RemoveAllListeners();
+								downloadProgressPanel.SetActive( true );
+
+								await Task.Yield(); // Wait a frame for downloadProgressPanel to show up
+
+								bool canceledDownload = false;
+								downloadCancelButton.onClick.AddListener( () => canceledDownload = true );
+
+								string tempDownloadPath = Path.Combine( Application.temporaryCachePath, @"FileTransfer.tmp" );
+								using( FileStream fileStream = File.Create( tempDownloadPath ) )
+								{
+									// Download the file
+									int count;
+									long bytesReceived = 0L;
+									while( !canceledDownload && bytesReceived < fileSize && ( count = stream.Read( networkStreamBuffer, 0, networkStreamBuffer.Length ) ) > 0 )
+									{
+										fileStream.Write( networkStreamBuffer, 0, count );
+										bytesReceived += count;
+
+										await Task.Yield();
+
+										downloadProgressbar.value = (float) ( (double) bytesReceived / fileSize );
+									}
+								}
+
+								downloadProgressbar.value = 1f;
+
+								await Task.Yield();
+
+								if( canceledDownload )
+									Debug.Log( "Download canceled: " + downloadedFilename );
+								else
+								{
+									FileBrowserHelpers.CopyFile( tempDownloadPath, fileTransferDownloadPath );
+
+									downloadCompletedLabel.text = "Downloaded:\n" + fileTransferDownloadPath;
+									downloadCompletedPanel.SetActive( true );
+								}
+
+								FileBrowserHelpers.DeleteFile( tempDownloadPath );
+							}
+						}
+						finally
+						{
+							fileTransferInProgress = false;
+							downloadProgressPanel.SetActive( false );
+						}
 
 						break;
 					}
@@ -546,6 +677,17 @@ public class RemoteOpBroadcaster : MonoBehaviour
 		{
 			CheckVolume();
 			yield return new WaitForSeconds( volumeCheckInterval );
+		}
+	}
+
+	private IEnumerator CheckPendingFileTransfersRegularlyCoroutine()
+	{
+		while( true )
+		{
+			if( !fileTransferInProgress )
+				SendOp( new RemoteOp( RemoteOpType.CheckPendingFileTransfer, null ) );
+
+			yield return new WaitForSeconds( pendingFileTransferCheckInterval );
 		}
 	}
 
